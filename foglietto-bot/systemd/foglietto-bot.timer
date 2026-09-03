@@ -1,0 +1,13 @@
+[Unit]
+Description=Controlla ogni mezz'ora se e' arrivato un foglietto nuovo
+
+[Timer]
+# Il foglietto arriva il sabato, ma lo scraper puo' depositarlo a qualsiasi
+# ora: un controllo ogni mezz'ora costa una lettura di cartella e basta.
+OnCalendar=*:00/30
+Persistent=true
+RandomizedDelaySec=120
+AccuracySec=1m
+
+[Install]
+WantedBy=timers.target

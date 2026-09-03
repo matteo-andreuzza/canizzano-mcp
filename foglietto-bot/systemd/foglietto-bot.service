@@ -1,0 +1,24 @@
+[Unit]
+Description=Redazione automatica del foglietto di Canizzano
+Documentation=file:/home/pi/foglietto-bot/README.md
+# Il CMS gira sulla stessa macchina: se e' spento la pipeline fallisce e
+# il PDF resta in coda, riprovato al giro dopo.
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=pi
+Group=pi
+WorkingDirectory=/home/pi/foglietto-bot
+ExecStart=/home/pi/foglietto-bot/venv/bin/python -m foglietto_bot scansiona
+TimeoutStartSec=2700
+Nice=10
+# Il bot scrive solo nella sua cartella di stato.
+PrivateTmp=true
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/pi/foglietto-bot/stato /home/pi/foglietto-bot/foglietti
+StandardOutput=journal
+StandardError=journal

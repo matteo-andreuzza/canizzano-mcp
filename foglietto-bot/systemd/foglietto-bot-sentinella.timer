@@ -1,0 +1,10 @@
+[Unit]
+Description=Controllo settimanale che il foglietto stia arrivando
+
+[Timer]
+OnCalendar=Mon *-*-* 09:00
+Persistent=true
+RandomizedDelaySec=600
+
+[Install]
+WantedBy=timers.target

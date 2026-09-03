@@ -1,0 +1,20 @@
+[Unit]
+Description=Avvisa se da troppo tempo non arriva un foglietto
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=pi
+Group=pi
+WorkingDirectory=/home/pi/foglietto-bot
+# Stesso comando del timer normale: se non c'e' niente da fare da piu' di
+# nove giorni manda una mail, cosi' uno scraper fermo non passa inosservato.
+ExecStart=/home/pi/foglietto-bot/venv/bin/python -m foglietto_bot scansiona --avvisa-se-vuoto
+TimeoutStartSec=2700
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/pi/foglietto-bot/stato /home/pi/foglietto-bot/foglietti
+StandardOutput=journal
+StandardError=journal
