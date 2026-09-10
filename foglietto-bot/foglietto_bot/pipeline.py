@@ -16,6 +16,7 @@ from datetime import date, datetime
 from pathlib import Path
 
 from . import analisi as stadio_analisi
+from . import attivita
 from . import report as stadio_report
 from .config import Config
 from .mcp_client import ClientMCP
@@ -101,6 +102,33 @@ def elabora(
     return riepilogo
 
 
+def _riga_di_registro(riepilogo: Riepilogo) -> tuple[str, str]:
+    """Riepilogo in due righe, per la dashboard della redazione.
+
+    Chi guarda /riservata/ non vuole rileggersi il report: vuole sapere se e'
+    andata bene e quanto e' stato scritto. Il dettaglio completo resta nella
+    mail e nella copia HTML in stato/report.
+    """
+    if riepilogo.errore_grave:
+        return "errore", f"{riepilogo.nome_file}: {riepilogo.errore_grave}"
+
+    conto = (
+        f"{len(riepilogo.pubblicati)} pubblicati, {len(riepilogo.bozze)} in bozza, "
+        f"{len(riepilogo.scartati)} scartati, {len(riepilogo.attenzione)} da vedere"
+    )
+    dettaglio = f"{riepilogo.nome_file}: {conto}."
+    if riepilogo.dry_run:
+        dettaglio += "\n\nModalità di prova: nel CMS non è stato scritto niente."
+    if riepilogo.attenzione:
+        dettaglio += (
+            "\n\nQualcosa è stato lasciato a una persona: guarda la mail di "
+            "riepilogo."
+        )
+    dettaglio += "\n\nQuello che è stato creato resta in redazione: sul sito non "
+    dettaglio += "compare finché non lo pubblichi tu."
+    return "ok", dettaglio
+
+
 def _consegna(cfg: Config, riepilogo: Riepilogo) -> None:
     stadio_report.salva_copia(cfg, riepilogo)
     try:
@@ -144,6 +172,11 @@ def scansiona(
             return []
 
         for foglietto in da_fare:
-            riepiloghi.append(elabora(foglietto, cfg, client, registro, oggi=oggi))
+            riepilogo = elabora(foglietto, cfg, client, registro, oggi=oggi)
+            riepiloghi.append(riepilogo)
+            # Una riga per foglietto nel registro condiviso col CMS: e' quello
+            # che la dashboard della redazione mostra sotto «Ultime attivita'».
+            stato, dettaglio = _riga_di_registro(riepilogo)
+            attivita.registra("ocr_redazione_foglietto", stato, dettaglio, cfg.file_attivita)
 
     return riepiloghi

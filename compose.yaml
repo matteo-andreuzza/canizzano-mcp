@@ -1,0 +1,56 @@
+# Stack del bot del foglietto: un solo container, sempre acceso.
+#
+#   bot   → scheduler interno + endpoint /attiva (vedi foglietto_bot/servizio.py)
+#
+# Si avvia con `docker compose up -d --build`, da questa cartella. Non serve
+# nessun cron di sistema, nessuno script lanciato a mano sull'host: dentro al
+# container, foglietto_bot/servizio.py fa scattare da solo scarica+scansiona
+# il sabato, un controllo ogni 30 minuti, e la sentinella il lunedi'.
+#
+# Si aggancia al CMS del sito (canizzano.it) e viene chiamato da esso tramite
+# la rete Docker esterna condivisa — vedi «Collegarsi al sito» nel README.
+
+name: foglietto-bot
+
+services:
+  bot:
+    build:
+      context: .
+    restart: always
+    env_file: [.env]
+    environment:
+      TZ: ${TZ:-Europe/Rome}
+    # Di default l'immagine gira come root: senza questo, i file che il bot
+    # scrive nei bind mount qui sotto (PDF, registro di idempotenza) finiscono
+    # di proprieta' di root sull'host, e l'utente che ha lanciato `docker
+    # compose up` non riesce piu' a toccarli senza sudo. 1000:1000 e' il primo
+    # utente non privilegiato su quasi ogni Linux (lo stesso default che usa
+    # anche il repository del sito) — se il tuo utente ha un altro uid,
+    # impostalo in `.env` (`id -u`, `id -g`).
+    user: "${UID_HOST:-1000}:${GID_HOST:-1000}"
+    volumes:
+      # PDF scaricati (archivio, mai riscritti) e stato di idempotenza
+      # (registro.db, bot.lock, copie HTML dei report): due cartelle
+      # sull'host, cosi' sopravvivono a `docker compose down` e a una
+      # ricostruzione dell'immagine.
+      - ${CARTELLA_FOGLIETTI_HOST:-./foglietti}:/app/foglietti
+      - ${CARTELLA_STATO_HOST:-./stato}:/app/stato
+      # Il registro condiviso della dashboard del sito: vive nell'altro
+      # repository, si monta l'intera cartella (non il solo file) perche' e'
+      # cosi' che la monta anche il sito stesso nei suoi container. Percorso
+      # host obbligatorio: senza, il container non parte — vedi .env.example.
+      - ${CARTELLA_LOG_SITO:?imposta CARTELLA_LOG_SITO nel .env, vedi .env.example}:/app/logs-sito
+    # Non "ports:": l'endpoint /attiva non deve essere raggiungibile da fuori
+    # la rete Docker condivisa. "expose" lo documenta senza pubblicarlo.
+    expose:
+      - "${ATTIVA_PORTA:-8088}"
+    networks:
+      - rete_condivisa
+
+networks:
+  # Rete esterna, creata una tantum (`docker network create <nome>`) e
+  # referenziata allo stesso modo nel compose.yaml del sito. Deve esistere
+  # prima di questo `docker compose up`, altrimenti l'errore lo dice chiaro.
+  rete_condivisa:
+    name: ${NOME_RETE_CONDIVISA:-canizzano_rete}
+    external: true

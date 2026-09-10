@@ -1,0 +1,9 @@
+pagina.html
+*.pdf
+__pycache__/
+*.pyc
+
+# Stack Docker (compose.yaml alla radice)
+.env
+/foglietti/
+/stato/

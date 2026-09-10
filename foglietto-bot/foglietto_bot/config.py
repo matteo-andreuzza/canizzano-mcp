@@ -58,6 +58,9 @@ class Config:
     # Cartelle
     cartella_foglietti: Path
     cartella_stato: Path
+    # Registro condiviso con la dashboard del CMS. Facoltativo: se manca, il
+    # bot lavora esattamente come prima e la dashboard non lo vede.
+    file_attivita: Path | None
 
     # Posta
     smtp_host: str
@@ -129,6 +132,9 @@ def carica(percorso_env: Path | None = None) -> Config:
         mcp_key=_stringa("MCP_KEY"),
         cartella_foglietti=_cartella("CARTELLA_FOGLIETTI", "~/foglietto-bot/foglietti"),
         cartella_stato=_cartella("CARTELLA_STATO", "~/foglietto-bot/stato"),
+        file_attivita=(
+            _cartella("FILE_ATTIVITA", "") if _stringa("FILE_ATTIVITA") else None
+        ),
         smtp_host=_stringa("SMTP_HOST"),
         smtp_port=_intero("SMTP_PORT", 587),
         smtp_user=_stringa("SMTP_USER"),

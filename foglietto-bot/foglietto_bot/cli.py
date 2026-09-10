@@ -15,6 +15,7 @@ import sys
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
+from . import attivita as registro_attivita
 from . import config as configurazione
 from . import pipeline, report
 from .models import Esito, Notizia, Pagina, TipoPagina
@@ -79,6 +80,11 @@ def comando_verifica(cfg: configurazione.Config) -> int:
         else:
             print("ultimo lavoro:  nessuno")
 
+    if cfg.file_attivita:
+        print(f"registro CMS:   {cfg.file_attivita}")
+    else:
+        print("registro CMS:   non impostato (FILE_ATTIVITA) — la dashboard\n"
+              "                della redazione non vedra' cosa fa il bot")
     print(f"report a:       {cfg.email_destinatario}")
     print(f"modalità:       {'PROVA (non scrive nel CMS)' if cfg.dry_run else 'normale'}")
     return 1 if problemi else 0
@@ -283,7 +289,22 @@ def principale(argomenti: list[str] | None = None) -> int:
             avvisa_se_vuoto=getattr(opzioni, "avvisa_se_vuoto", False),
         )
     except pipeline.GiaInEsecuzione as errore:
+        # Non e' un guasto — succede ogni volta che il timer e un avvio a mano
+        # si accavallano, ed e' esattamente cio' che il lucchetto deve fare.
+        # Ma va detto a chi ha premuto il bottone, altrimenti dalla dashboard
+        # l'avvio sembra sparito nel nulla: la riga la scriviamo come «errore»
+        # perche' il registro conosce solo due stati, e «ok» direbbe che il
+        # foglietto e' stato elaborato adesso, che non e' vero.
         log.info("Non faccio niente: %s", errore)
+        registro_attivita.registra(
+            "ocr_redazione_foglietto",
+            "errore",
+            "Esecuzione già in corso, avvio ignorato.\n\n"
+            "Un'altra elaborazione stava già lavorando quando questa è partita: "
+            "questa si è fermata subito per non scrivere due volte gli stessi "
+            "contenuti. L'esito di quella in corso arriva fra poco.",
+            cfg.file_attivita,
+        )
         return 0
     except configurazione.ErroreConfigurazione as errore:
         print(errore, file=sys.stderr)

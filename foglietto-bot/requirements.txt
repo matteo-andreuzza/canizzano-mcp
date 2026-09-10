@@ -2,3 +2,7 @@ google-genai>=1.0.0
 python-dotenv>=1.0.0
 requests>=2.31.0
 pydantic>=2.6.0
+beautifulsoup4>=4.12.0
+# Solo per il servizio Docker (foglietto_bot/servizio.py): scheduler interno
+# che sostituisce i timer di systemd. Non serve all'uso da riga di comando.
+apscheduler>=3.10.0,<4.0.0

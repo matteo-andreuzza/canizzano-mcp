@@ -1,0 +1,36 @@
+[Unit]
+Description=Scarica il foglietto della settimana dal sito della parrocchia
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=pi
+Group=pi
+WorkingDirectory=/home/pi
+# Dove depositare il PDF: detto esplicitamente, non piu' dedotto dalla cartella
+# corrente. Sono le stesse due variabili che legge il bot dal suo .env — qui
+# vanno scritte perche' systemd il .env non lo legge.
+Environment=CARTELLA_FOGLIETTI=/home/pi/foglietto-bot/foglietti
+Environment=FILE_ATTIVITA=/home/pi/canizzano/logs/attivita.log
+# Serve a «python -m foglietto_bot.attivita» qui sotto: il pacchetto sta
+# altrove rispetto alla cartella di lavoro.
+Environment=PYTHONPATH=/home/pi/foglietto-bot
+ExecStart=/home/pi/foglietto-bot/venv/bin/python /home/pi/foglietto-bot-src/scraper.py
+# Una riga nel registro delle attivita' del CMS, cosi' lo scaricamento
+# automatico si vede sulla dashboard come quello chiesto a mano. ExecStartPost
+# gira solo se e' andata bene; il caso storto lo prende ExecStopPost, che gira
+# sempre e guarda $SERVICE_RESULT.
+ExecStartPost=/home/pi/foglietto-bot/venv/bin/python -m foglietto_bot.attivita scraper_foglietto ok
+ExecStopPost=/bin/sh -c 'test "$SERVICE_RESULT" = success || /home/pi/foglietto-bot/venv/bin/python -m foglietto_bot.attivita scraper_foglietto errore'
+TimeoutStartSec=300
+Nice=10
+PrivateTmp=true
+NoNewPrivileges=true
+ProtectSystem=strict
+# La cartella dei foglietti (dove finisce il PDF) e quella sopra, dove lo
+# scraper lascia la pagina scaricata mentre la sta leggendo.
+ReadWritePaths=/home/pi/foglietto-bot /home/pi/foglietto-bot/foglietti
+ReadWritePaths=/home/pi/canizzano/logs
+StandardOutput=journal
+StandardError=journal

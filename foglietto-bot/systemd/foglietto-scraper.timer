@@ -1,0 +1,13 @@
+[Unit]
+Description=Cerca il foglietto nuovo ogni sabato
+
+[Timer]
+# Il foglietto esce nel fine settimana. Alle 9 e' gia' online; la
+# sentinella passa comunque ogni mezz'ora, quindi non serve azzeccare l'ora.
+OnCalendar=Sat *-*-* 09:00:00
+Persistent=true
+RandomizedDelaySec=600
+AccuracySec=1m
+
+[Install]
+WantedBy=timers.target

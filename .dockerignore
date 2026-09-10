@@ -1,0 +1,13 @@
+.git
+.env
+foglietto-bot/.env
+foglietto-bot/venv
+foglietto-bot/.pytest_cache
+foglietto-bot/tests
+foglietto-bot/stato
+foglietto-bot/foglietti
+**/__pycache__
+**/*.pyc
+*.pdf
+pagina.html
+foglietto-bot/pagina.html

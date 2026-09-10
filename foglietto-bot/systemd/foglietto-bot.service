@@ -20,5 +20,10 @@ NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=read-only
 ReadWritePaths=/home/pi/foglietto-bot/stato /home/pi/foglietto-bot/foglietti
+# Il registro delle attivita' del CMS sta nell'altro repository: e' quello che
+# la dashboard della redazione mostra sotto «Ultime attivita'». Senza questa
+# riga ProtectSystem=strict lo rende di sola lettura e il bot lavora bene ma
+# resta invisibile da li'.
+ReadWritePaths=/home/pi/canizzano/logs
 StandardOutput=journal
 StandardError=journal
