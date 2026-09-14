@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Monitor compustudio</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--ink:#1b1f24;--mute:#667085;--line:#e4e7ec;--ok:#12805c;--warn:#b54708;--ko:#c0262d;--acc:#2f5bea;--bar:#eef0f3;--mono:ui-monospace,SFMono-Regular,Menlo,monospace}
+@media (prefers-color-scheme:dark){:root{--bg:#0f1216;--card:#171b21;--ink:#e6e8eb;--mute:#8b95a3;--line:#262c35;--ok:#3ecf8e;--warn:#f0a44b;--ko:#f06a6a;--acc:#7c9cff;--bar:#232932}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,sans-serif;padding:16px}
+header{display:flex;flex-wrap:wrap;gap:12px;align-items:baseline;justify-content:space-between;max-width:1280px;margin:0 auto 14px}
+h1{font-size:18px;margin:0}h2{font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--mute);margin:0 0 10px}
+.mute{color:var(--mute)}.mono{font-family:var(--mono);font-size:12px}
+main{max-width:1280px;margin:0 auto;display:grid;gap:14px;grid-template-columns:repeat(12,1fr)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;min-width:0}
+.s12{grid-column:span 12}.s6{grid-column:span 6}.s4{grid-column:span 4}.s8{grid-column:span 8}
+@media(max-width:900px){.s6,.s4,.s8{grid-column:span 12}}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.kpi .v{font-size:22px;font-weight:600;font-variant-numeric:tabular-nums}
+.meter{height:6px;background:var(--bar);border-radius:3px;overflow:hidden;margin-top:6px}.meter i{display:block;height:100%;background:var(--acc)}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:middle;background:var(--mute)}
+.ok{color:var(--ok)}.warn{color:var(--warn)}.ko{color:var(--ko)}
+.dot.ok{background:var(--ok)}.dot.warn{background:var(--warn)}.dot.ko{background:var(--ko)}
+.tw{overflow-x:auto}table{border-collapse:collapse;width:100%}th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap;font-variant-numeric:tabular-nums}
+th{font-weight:500;color:var(--mute);font-size:12px}td.wrap{white-space:normal}
+button,select{font:inherit;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:5px 10px;cursor:pointer}
+button:hover{border-color:var(--acc)}button.pri{background:var(--acc);color:#fff;border-color:var(--acc)}button:disabled{opacity:.5;cursor:wait}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+pre{background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:10px;margin:10px 0 0;max-height:420px;overflow:auto;font:12px/1.4 var(--mono);white-space:pre-wrap;word-break:break-word}
+details{border-bottom:1px solid var(--line);padding:6px 0}summary{cursor:pointer}
+.err{color:var(--ko);font-family:var(--mono);font-size:12px}
+</style>
+</head>
+<body>
+<header>
+  <div><h1 id="titolo">Monitor Raspberry</h1><span class="mute" id="agg">caricamento…</span></div>
+  <div class="row">
+    <label class="mute"><input type="checkbox" id="auto" checked> auto 10s</label>
+    <button onclick="carica()">Aggiorna</button>
+  </div>
+</header>
+<main>
+  <section class="card s12"><h2>Host</h2><div class="kpis" id="host"></div></section>
+  <section class="card s4"><h2>Servizi</h2><div id="servizi"></div></section>
+  <section class="card s8"><h2>Azioni</h2>
+    <div class="row">
+      <button class="pri" onclick="azione('prova-report')">prova-report</button>
+      <button onclick="azione('verifica')">verifica bot</button>
+      <button onclick="azione('stato-bot')">stato bot</button>
+    </div>
+    <pre id="esito" hidden></pre>
+  </section>
+  <section class="card s12"><h2>Container</h2><div class="tw" id="container"></div></section>
+  <section class="card s6"><h2>Foglietti (registro.db)</h2><div id="registro"></div></section>
+  <section class="card s6"><h2>Attività (attivita.log)</h2><div id="attivita"></div></section>
+  <section class="card s12"><h2>Log container</h2>
+    <div class="row"><select id="logsel"></select>
+      <select id="logn"><option>100</option><option selected>300</option><option>1000</option></select>
+      <input id="filtro" placeholder="filtra…" style="font:inherit;padding:5px 8px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--ink)">
+      <button onclick="caricaLog()">Carica</button><label class="mute"><input type="checkbox" id="logauto"> segui</label></div>
+    <pre id="log">scegli un container</pre>
+  </section>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const gb=b=>b>=1073741824?(b/1073741824).toFixed(1)+' GB':(b/1048576).toFixed(0)+' MB';
+const dur=s=>{s=Math.floor(s);const d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60);return d?`${d}g ${h}h`:h?`${h}h ${m}m`:`${m}m`};
+const fa=t=>{const s=(Date.now()-new Date(t).getTime())/1000;return s<60?'ora':dur(s)+' fa'};
+const lv=(v,w,k)=>v>=k?'ko':v>=w?'warn':'ok';
+function kpi(nome,val,sotto,perc,cls){return `<div class="kpi"><div class="mute">${nome}</div><div class="v ${cls||''}">${val}</div><div class="mute mono">${sotto||''}</div>${perc!=null?`<div class="meter"><i style="width:${Math.min(perc,100)}%"></i></div>`:''}</div>`}
+function errore(b){return `<div class="err">${esc(b.errore)}</div>`}
+
+async function api(u,o){const r=await fetch(u,o);if(!r.ok)throw new Error(r.status+' '+r.statusText);return r.json()}
+
+async function carica(){
+  try{
+    const d=await api('api/stato');
+    $('agg').textContent='aggiornato '+new Date(d.ora*1000).toLocaleTimeString('it-IT');
+    renderHost(d.host);renderServizi(d);renderContainer(d.container);renderRegistro(d.registro);renderAttivita(d.attivita);
+  }catch(e){$('agg').innerHTML=`<span class="ko">errore: ${esc(e.message)}</span>`}
+}
+function renderHost(b){
+  if(!b.ok)return $('host').innerHTML=errore(b);const h=b.dati;
+  $('titolo').textContent='Monitor '+h.nome;document.title='Monitor '+h.nome;
+  const mp=h.mem_usata/h.mem_totale*100,dp=h.disco_usato/h.disco_totale*100;
+  const th=h.throttled;const thTxt=th==null?'n/d':th===0?'nessuno':'0x'+th.toString(16);
+  const thCls=th==null?'':th&0xF?'ko':th?'warn':'ok';
+  $('host').innerHTML=
+    kpi('CPU',h.cpu+'%',`${h.ncpu} core`,h.cpu,lv(h.cpu,70,90))+
+    kpi('Carico',h.carico[0].toFixed(2),h.carico.map(x=>x.toFixed(2)).join(' · '),h.carico[0]/h.ncpu*100,lv(h.carico[0]/h.ncpu,.8,1.5))+
+    kpi('Temperatura',h.temperatura==null?'n/d':h.temperatura.toFixed(1)+' °C','soglia throttle 80 °C',h.temperatura&&h.temperatura/85*100,lv(h.temperatura||0,65,78))+
+    kpi('Memoria',mp.toFixed(0)+'%',`${gb(h.mem_usata)} / ${gb(h.mem_totale)}`+(h.swap_totale?` · swap ${gb(h.swap_usata)}`:''),mp,lv(mp,80,92))+
+    kpi('Disco /',dp.toFixed(0)+'%',`${gb(h.disco_usato)} / ${gb(h.disco_totale)}`,dp,lv(dp,80,92))+
+    kpi('Uptime',dur(h.uptime),'')+
+    kpi('Throttling',thTxt,'undervoltage / freq cap',null,thCls);
+}
+function renderServizi(d){
+  const riga=(n,s)=>`<div style="margin-bottom:8px"><span class="dot ${s.ok?'ok':'ko'}"></span><b>${n}</b> <span class="mute mono">${s.codice??'—'} · ${s.ms} ms</span><div class="mute mono">${esc(s.url)}</div>${s.errore?`<div class="err">${esc(s.errore)}</div>`:''}</div>`;
+  $('servizi').innerHTML=riga('CMS Django',d.cms)+riga('Bot foglietto',d.bot);
+}
+function renderContainer(b){
+  if(!b.ok)return $('container').innerHTML=errore(b);
+  const sel=$('logsel'),prec=sel.value;
+  sel.innerHTML=b.dati.map(c=>`<option>${esc(c.nome)}</option>`).join('');
+  if(prec)sel.value=prec;else if(b.dati.some(c=>c.nome==='foglietto-bot-bot-1'))sel.value='foglietto-bot-bot-1';
+  $('container').innerHTML=`<table><tr><th>Container</th><th>Progetto</th><th>Stato</th><th>CPU</th><th>Memoria</th><th></th></tr>`+
+    b.dati.map(c=>{const cls=c.stato!=='running'?'ko':c.salute==='unhealthy'?'ko':c.salute==='starting'?'warn':'ok';
+      return `<tr><td><span class="dot ${cls}"></span><b>${esc(c.nome)}</b><div class="mute mono">${esc(c.immagine)}</div></td><td>${esc(c.progetto)}</td>
+      <td class="${cls}">${esc(c.descrizione)}</td><td>${c.cpu!=null?c.cpu+'%':'—'}</td><td>${c.mem?gb(c.mem):'—'}</td>
+      <td class="row"><button onclick="vediLog('${esc(c.nome)}')">log</button><button onclick="riavvia('${esc(c.nome)}')">riavvia</button></td></tr>`}).join('')+'</table>';
+}
+function renderRegistro(b){
+  if(!b.ok)return $('registro').innerHTML=errore(b);const r=b.dati;
+  if(!r.presente)return $('registro').innerHTML='<span class="mute">registro.db non trovato</span>';
+  const c=r.conteggi;
+  $('registro').innerHTML=`<div class="row" style="margin-bottom:8px"><span class="ok">✓ ${c.completato||0} completati</span><span class="warn">… ${c.in_corso||0} in corso</span><span class="ko">✗ ${c.errore||0} errori</span></div>
+  <div class="tw"><table><tr><th>File</th><th>Stato</th><th>Contenuti</th><th>Tent.</th><th>Aggiornato</th></tr>`+
+  r.foglietti.map(f=>`<tr><td>${esc(f.nome_file)}</td><td class="${f.stato==='completato'?'ok':f.stato==='errore'?'ko':'warn'}">${esc(f.stato)}</td><td>${f.contenuti}</td><td>${f.tentativi}</td><td title="${esc(f.aggiornato_il)}">${fa(f.aggiornato_il)}</td></tr>`+
+    (f.errore?`<tr><td colspan="5" class="wrap err">${esc(f.errore)}</td></tr>`:'')).join('')+`</table></div>
+  <h2 style="margin-top:14px">Ultimi contenuti scritti</h2>`+
+  r.contenuti.map(x=>`<div><span class="mute mono">${esc(x.tipo)}</span> ${esc(x.titolo)} ${x.pubblicato?'<span class="ok">pubblicato</span>':'<span class="warn">bozza</span>'} <span class="mute">${fa(x.creato_il)}</span></div>`).join('')+
+  `<h2 style="margin-top:14px">Report</h2>`+r.report.map(x=>`<div class="mono">${esc(x.nome)} <span class="mute">${fa(x.quando*1000)}</span></div>`).join('');
+}
+function renderAttivita(b){
+  if(!b.ok)return $('attivita').innerHTML=errore(b);
+  const aperti=new Set([...document.querySelectorAll('#attivita details[open]')].map(e=>e.dataset.k));
+  $('attivita').innerHTML=b.dati.map((v,i)=>{const k=v.id||v.timestamp+v.processo;const cls=v.stato==='ok'?'ok':v.stato==='errore'?'ko':'warn';
+    return `<details data-k="${esc(k)}" ${aperti.has(k)?'open':''}><summary><span class="dot ${cls}"></span><b>${esc(v.processo)}</b> <span class="mute">${esc(v.stato)} · ${new Date(v.timestamp).toLocaleString('it-IT')}</span></summary><pre>${esc(v.dettaglio)}</pre></details>`}).join('')||'<span class="mute">vuoto</span>';
+}
+async function caricaLog(){
+  const n=$('logsel').value;if(!n)return;
+  try{const b=await api(`api/log?container=${encodeURIComponent(n)}&righe=${$('logn').value}`);
+    let t=b.ok?b.dati:b.errore;const f=$('filtro').value.toLowerCase();
+    if(f)t=t.split('\n').filter(l=>l.toLowerCase().includes(f)).join('\n');
+    const p=$('log'),giu=p.scrollTop+p.clientHeight>=p.scrollHeight-20;p.textContent=t||'(nessuna riga)';if(giu||!$('logauto').checked)p.scrollTop=p.scrollHeight;
+  }catch(e){$('log').textContent='errore: '+e.message}
+}
+function vediLog(n){$('logsel').value=n;caricaLog();$('log').scrollIntoView({behavior:'smooth'})}
+async function post(corpo,btn){
+  const p=$('esito');p.hidden=false;p.textContent='in esecuzione…';
+  document.querySelectorAll('button').forEach(b=>b.disabled=true);
+  try{const b=await api('api/azione',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(corpo)});
+    const d=b.dati||{};p.innerHTML=`<span class="${b.ok&&d.ok!==false?'ok':'ko'}">${esc(corpo.azione)} → ${b.ok?('uscita '+(d.uscita??'ok')):'errore'}</span>\n\n`+esc(b.ok?d.output:b.errore);
+  }catch(e){p.textContent='errore: '+e.message}
+  document.querySelectorAll('button').forEach(b=>b.disabled=false);carica();
+}
+const azione=a=>post({azione:a});
+function riavvia(n){if(confirm(`Riavviare ${n}?`))post({azione:'riavvia',container:n})}
+carica();caricaLog();
+setInterval(()=>{if($('auto').checked&&!document.hidden)carica()},10000);
+setInterval(()=>{if($('logauto').checked&&!document.hidden)caricaLog()},3000);
+</script>
+</body>
+</html>

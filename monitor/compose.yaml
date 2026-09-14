@@ -1,0 +1,35 @@
+# Dashboard di monitoraggio del Raspberry Pi (solo per lo sviluppatore).
+#
+#   cd monitor && docker compose up -d --build
+#   → http://compustudio.local:8090  (utente qualsiasi, password = MONITOR_TOKEN)
+#
+# Legge l'host in sola lettura (/proc, /sys, /) e parla con Docker via socket:
+# il socket e' di fatto root sull'host, quindi NON esporre la porta su
+# internet. Da remoto passa da Tailscale/WireGuard o da un tunnel ssh:
+#   ssh -L 8090:localhost:8090 compustudio.local
+
+name: canizzano-monitor
+
+services:
+  monitor:
+    build: .
+    restart: always
+    env_file: [.env]
+    environment:
+      TZ: ${TZ:-Europe/Rome}
+    ports:
+      - "${MONITOR_BIND:-0.0.0.0}:${MONITOR_PORTA:-8090}:8090"
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/host/root:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ../stato:/stato-bot:ro
+      - ${CARTELLA_LOG_SITO:?imposta CARTELLA_LOG_SITO nel .env}:/logs-sito:ro
+    networks:
+      - rete_condivisa
+
+networks:
+  rete_condivisa:
+    name: ${NOME_RETE_CONDIVISA:-canizzano_rete}
+    external: true
