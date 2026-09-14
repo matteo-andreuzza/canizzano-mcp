@@ -27,14 +27,21 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY foglietto-bot/foglietto_bot ./foglietto_bot
 COPY scraper.py .
 
-# Il container gira con l'uid dell'host (vedi "user:" in compose.yaml), non
-# root: la build invece e' sempre root, quindi senza questo /app resterebbe
-# di sua proprieta' e un uid qualunque non potrebbe scriverci il file di
-# lavoro dello scraper (pagina.html, accanto a CARTELLA_FOGLIETTI — l'unica
-# cosa che scraper.py scrive fuori dai bind mount). L'uid vero non si conosce
-# in fase di build (e' scelto nel .env), quindi si apre a chiunque invece di
-# indovinarlo.
+# Il container finisce per girare con l'uid dell'host (vedi entrypoint.sh),
+# non root: la build invece e' sempre root, quindi senza questo /app
+# resterebbe di sua proprieta' e un uid qualunque non potrebbe scriverci il
+# file di lavoro dello scraper (pagina.html, accanto a CARTELLA_FOGLIETTI —
+# l'unica cosa che scraper.py scrive fuori dai bind mount). L'uid vero non si
+# conosce in fase di build (e' scelto nel .env), quindi si apre a chiunque
+# invece di indovinarlo.
 RUN chmod 777 /app
+
+# Vedi entrypoint.sh: gira come root solo per sistemare i permessi delle
+# cartelle montate (stato/, foglietti/), poi lascia il posto all'utente non
+# privilegiato prima del CMD qui sotto.
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+ENTRYPOINT ["/entrypoint.sh"]
 
 # Percorsi interni fissi (bind mount definiti in compose.yaml): l'utente non
 # li tocca, configura solo dove stanno sull'host.

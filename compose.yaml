@@ -20,14 +20,15 @@ services:
     env_file: [.env]
     environment:
       TZ: ${TZ:-Europe/Rome}
-    # Di default l'immagine gira come root: senza questo, i file che il bot
-    # scrive nei bind mount qui sotto (PDF, registro di idempotenza) finiscono
-    # di proprieta' di root sull'host, e l'utente che ha lanciato `docker
-    # compose up` non riesce piu' a toccarli senza sudo. 1000:1000 e' il primo
-    # utente non privilegiato su quasi ogni Linux (lo stesso default che usa
-    # anche il repository del sito) — se il tuo utente ha un altro uid,
-    # impostalo in `.env` (`id -u`, `id -g`).
-    user: "${UID_HOST:-1000}:${GID_HOST:-1000}"
+    # Niente "user:" qui: il container parte come root e ci resta solo il
+    # tempo che serve a entrypoint.sh per sistemare i permessi delle cartelle
+    # qui sotto (Docker le crea come root se non esistono gia' — succede
+    # anche solo al primo `docker compose up`, o lanciandolo con `sudo`), poi
+    # l'entrypoint lascia il posto a un utente non privilegiato prima di far
+    # partire il bot vero. 1000:1000 e' il default (il primo utente non
+    # privilegiato su quasi ogni Linux, lo stesso che usa anche il
+    # repository del sito) — se il tuo utente ha un altro uid, impostalo in
+    # `.env` (`id -u`, `id -g`) come UID_HOST/GID_HOST.
     volumes:
       # PDF scaricati (archivio, mai riscritti) e stato di idempotenza
       # (registro.db, bot.lock, copie HTML dei report): due cartelle
